@@ -1,33 +1,48 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { submitClaimService } from '../api/c_end_service';
+import { submitClaimService, resubmitClaimService } from '../api/c_end_service';
 import { Header } from '../components/Header';
 import { Camera, X, AlertCircle } from 'lucide-react';
 import { MOCK_HOSPITALS } from '../mockData';
 import { format } from 'date-fns';
 
 export function ClaimApplyView() {
-  const { user, addClaim, setCurrentView } = useAppStore();
-  const [patientName, setPatientName] = useState(user?.name || '');
-  const [patientIdCard, setPatientIdCard] = useState(user?.idCard || '');
-  const [patientIdCardFront, setPatientIdCardFront] = useState<string[]>(user?.idCardFront ? [user.idCardFront] : []);
-  const [patientIdCardBack, setPatientIdCardBack] = useState<string[]>(user?.idCardBack ? [user.idCardBack] : []);
-  const [hospital, setHospital] = useState('');
-  const [otherHospital, setOtherHospital] = useState('');
-  const [department, setDepartment] = useState('');
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [type, setType] = useState<'门诊'|'急诊'>('门诊');
-  const [amount, setAmount] = useState('');
+  const { user, claims, addClaim, updateClaim, setCurrentView, viewProps } = useAppStore();
+  const editClaim = React.useMemo(() => claims.find(c => c.id === viewProps?.editId), [claims, viewProps?.editId]);
+
+  // Determine initial hospital matching logic
+  let initialHospital = '';
+  let initialOtherHospital = '';
+  if (editClaim?.hospitalName) {
+    const matched = MOCK_HOSPITALS.find(h => h.name === editClaim.hospitalName);
+    if (matched) {
+      initialHospital = matched.id;
+    } else {
+      initialHospital = 'other';
+      initialOtherHospital = editClaim.hospitalName;
+    }
+  }
+
+  const [patientName, setPatientName] = useState(editClaim?.patientName || user?.name || '');
+  const [patientIdCard, setPatientIdCard] = useState(editClaim?.patientIdCard || user?.idCard || '');
+  const [patientIdCardFront, setPatientIdCardFront] = useState<string[]>(editClaim?.patientIdCardFront ? [editClaim.patientIdCardFront] : (user?.idCardFront ? [user.idCardFront] : []));
+  const [patientIdCardBack, setPatientIdCardBack] = useState<string[]>(editClaim?.patientIdCardBack ? [editClaim.patientIdCardBack] : (user?.idCardBack ? [user.idCardBack] : []));
+  const [hospital, setHospital] = useState(initialHospital);
+  const [otherHospital, setOtherHospital] = useState(initialOtherHospital);
+  const [department, setDepartment] = useState(editClaim?.department || '');
+  const [date, setDate] = useState(editClaim?.date || format(new Date(), 'yyyy-MM-dd'));
+  const [type, setType] = useState<'门诊'|'急诊'>(editClaim?.type || '门诊');
+  const [amount, setAmount] = useState(editClaim?.amount?.toString() || '');
   
-  const [payeeName, setPayeeName] = useState('');
-  const [payeeAccount, setPayeeAccount] = useState('');
-  const [payeeBank, setPayeeBank] = useState('');
+  const [payeeName, setPayeeName] = useState(editClaim?.payeeName || '');
+  const [payeeAccount, setPayeeAccount] = useState(editClaim?.payeeAccount || '');
+  const [payeeBank, setPayeeBank] = useState(editClaim?.payeeBank || '');
   
-  const [invoice, setInvoice] = useState<string[]>([]);
-  const [record, setRecord] = useState<string[]>([]);
-  const [cost, setCost] = useState<string[]>([]);
-  const [prescription, setPrescription] = useState<string[]>([]);
-  const [diagnosis, setDiagnosis] = useState<string[]>([]);
+  const [invoice, setInvoice] = useState<string[]>(editClaim?.images.invoice || []);
+  const [record, setRecord] = useState<string[]>(editClaim?.images.record || []);
+  const [cost, setCost] = useState<string[]>(editClaim?.images.cost || []);
+  const [prescription, setPrescription] = useState<string[]>(editClaim?.images.prescription || []);
+  const [diagnosis, setDiagnosis] = useState<string[]>(editClaim?.images.diagnosis || []);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   
   const [loading, setLoading] = useState(false);
@@ -60,7 +75,7 @@ export function ClaimApplyView() {
 
     setLoading(true);
         try {
-      const newClaim = await submitClaimService({
+      const claimData = {
         userId: user!.id,
         userName: user!.name!,
         patientName,
@@ -76,8 +91,15 @@ export function ClaimApplyView() {
         payeeAccount,
         payeeBank,
         images: { invoice, record, cost, prescription, diagnosis }
-      } as any);
-      addClaim(newClaim);
+      };
+
+      if (editClaim) {
+        await resubmitClaimService(editClaim.id, claimData);
+        updateClaim(editClaim.id, { ...claimData, status: '待审核' });
+      } else {
+        const newClaim = await submitClaimService(claimData as any);
+        addClaim(newClaim);
+      }
       setCurrentView('my');
     } catch (err: any) {
       setError(err.message || '提交失败');

@@ -37,7 +37,7 @@ export function MyRecordsView() {
     if (claimFilter === '已撤销') return c.status === '已撤销';
     if (claimFilter === '已驳回') return c.status === '已驳回';
     return true;
-  });
+  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   
   const userInpatients = inpatientApps.filter(c => {
     if (c.userId !== user?.id) return false;
@@ -46,7 +46,7 @@ export function MyRecordsView() {
     if (inpatientFilter === '已撤销') return c.status === '已撤销';
     if (inpatientFilter === '已驳回') return c.status === '已驳回';
     return true;
-  });
+  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const getStatusColor = (status: string) => {
     if (status === '已审核' || status === '已确认') return 'text-green-600 bg-green-50 border-green-100';
@@ -172,6 +172,13 @@ export function MyRecordsView() {
                 撤销申请
               </button>
             )}
+            {selectedClaim.status === '已驳回' && (
+              <button 
+                onClick={() => setCurrentView('claimApply', { editId: selectedClaim.id })}
+                className="mt-4 px-6 py-2 bg-blue-600 text-white text-xs font-bold rounded-full active:bg-blue-700">
+                重新编辑
+              </button>
+            )}
           </div>
 
           <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
@@ -270,6 +277,13 @@ export function MyRecordsView() {
             {selectedInpatient.status === '待确认' && (
               <button onClick={handleWithdrawInpatient} className="mt-4 px-6 py-2 bg-slate-100 text-slate-600 text-xs font-bold rounded-full active:bg-slate-200">
                 撤销报备
+              </button>
+            )}
+            {selectedInpatient.status === '已驳回' && (
+              <button 
+                onClick={() => setCurrentView('inpatientApply', { editId: selectedInpatient.id })}
+                className="mt-4 px-6 py-2 bg-purple-600 text-white text-xs font-bold rounded-full active:bg-purple-700">
+                重新编辑
               </button>
             )}
           </div>
@@ -409,7 +423,7 @@ export function MyRecordsView() {
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-slate-800">{claim.hospitalName}{claim.department ? ` - ${claim.department}` : ''}</h4>
-                      <p className="text-[10px] text-slate-400">就医队员: {claim.patientName} · {format(new Date(claim.createdAt), 'yyyy-MM-dd HH:mm')} · {claim.type}</p>
+                      <p className="text-[10px] text-slate-400">就医队员: {claim.patientName} · 提交时间: {format(new Date(claim.createdAt), 'yyyy-MM-dd HH:mm')} · {claim.type}</p>
                     </div>
                   </div>
                   <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold border ${getStatusColor(claim.status)}`}>
@@ -444,9 +458,16 @@ export function MyRecordsView() {
                   </div>
                 )}
                 
-                {claim.status === '已驳回' && claim.requiredDocs && claim.requiredDocs.length > 0 && (
+                {claim.status === '已驳回' && (
                   <div className="mt-3 flex justify-end">
-                    <button className="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-full">补充材料</button>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentView('claimApply', { editId: claim.id });
+                      }}
+                      className="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-full">
+                      重新编辑
+                    </button>
                   </div>
                 )}
               </div>
@@ -470,7 +491,7 @@ export function MyRecordsView() {
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-slate-800">{app.hospitalName}{app.department ? ` - ${app.department}` : ''}</h4>
-                      <p className="text-[10px] text-slate-400">就医队员: {app.patientName} · {format(new Date(app.createdAt), 'yyyy-MM-dd HH:mm')}</p>
+                      <p className="text-[10px] text-slate-400">就医队员: {app.patientName} · 提交时间: {format(new Date(app.createdAt), 'yyyy-MM-dd HH:mm')}</p>
                     </div>
                   </div>
                   <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold border ${getStatusColor(app.status)}`}>
@@ -491,10 +512,22 @@ export function MyRecordsView() {
                 </div>
 
                 {app.status === '已驳回' && (
-                  <div className="mt-3 text-[11px] text-red-600 bg-red-50 p-2 rounded-lg flex gap-1">
-                     <AlertCircle size={14} className="shrink-0" />
-                     <span>原因：{app.rejectReason}</span>
-                  </div>
+                  <>
+                    <div className="mt-3 text-[11px] text-red-600 bg-red-50 p-2 rounded-lg flex gap-1">
+                      <AlertCircle size={14} className="shrink-0" />
+                      <span>原因：{app.rejectReason}</span>
+                    </div>
+                    <div className="mt-3 flex justify-end">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentView('inpatientApply', { editId: app.id });
+                        }}
+                        className="px-4 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-full">
+                        重新编辑
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
             ))}

@@ -386,3 +386,17 @@ export const reviewInpatientAppService = async (appId: string, action: 'approve'
     resolve();
   }, 800));
 };
+
+export const resubmitClaimService = async (claimId: string, data: Partial<Claim>): Promise<void> => {
+  return new Promise((resolve) => setTimeout(() => {
+    mockClaims = mockClaims.map(c => c.id === claimId ? { ...c, ...data, status: '待审核' } : c);
+    resolve();
+  }, 800));
+};
+
+export const resubmitInpatientAppService = async (appId: string, data: Partial<InpatientApp>): Promise<void> => {
+  return new Promise((resolve) => setTimeout(() => {
+    mockInpatientApps = mockInpatientApps.map(a => a.id === appId ? { ...a, ...data, status: '待确认' } : a);
+    resolve();
+  }, 800));
+};

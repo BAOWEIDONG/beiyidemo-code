@@ -35,7 +35,7 @@ export function ReviewWorkBenchView() {
     if (claimFilter === '已审核') return c.status === '已审核';
     if (claimFilter === '已驳回') return c.status === '已驳回';
     return true; // 全部
-  });
+  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const filteredInpatients = inpatientApps.filter(c => {
     if (!isBeiyi) return false;
@@ -43,7 +43,7 @@ export function ReviewWorkBenchView() {
     if (inpatientFilter === '已确认') return c.status === '已确认';
     if (inpatientFilter === '已驳回') return c.status === '已驳回';
     return true; // 全部
-  });
+  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const handleLogout = () => {
     setUser(null);

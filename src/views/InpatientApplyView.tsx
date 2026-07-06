@@ -1,24 +1,39 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { useAppStore } from '../store';
-import { submitInpatientAppService } from '../api/c_end_service';
+import { submitInpatientAppService, resubmitInpatientAppService } from '../api/c_end_service';
 import { Header } from '../components/Header';
 import { Camera, X, AlertCircle } from 'lucide-react';
 import { MOCK_HOSPITALS } from '../mockData';
 
 export function InpatientApplyView() {
-  const { user, addInpatientApp, setCurrentView } = useAppStore();
-  const [patientName, setPatientName] = useState(user?.name || '');
-  const [patientIdCard, setPatientIdCard] = useState(user?.idCard || '');
-  const [patientIdCardFront, setPatientIdCardFront] = useState<string[]>(user?.idCardFront ? [user.idCardFront] : []);
-  const [patientIdCardBack, setPatientIdCardBack] = useState<string[]>(user?.idCardBack ? [user.idCardBack] : []);
+  const { user, inpatientApps, addInpatientApp, updateInpatientApp, setCurrentView, viewProps } = useAppStore();
+  const editApp = React.useMemo(() => inpatientApps.find(a => a.id === viewProps?.editId), [inpatientApps, viewProps?.editId]);
+
+  // Determine initial hospital matching logic
+  let initialHospital = '';
+  let initialOtherHospital = '';
+  if (editApp?.hospitalName) {
+    const matched = MOCK_HOSPITALS.find(h => h.name === editApp.hospitalName);
+    if (matched) {
+      initialHospital = matched.id;
+    } else {
+      initialHospital = 'other';
+      initialOtherHospital = editApp.hospitalName;
+    }
+  }
+
+  const [patientName, setPatientName] = useState(editApp?.patientName || user?.name || '');
+  const [patientIdCard, setPatientIdCard] = useState(editApp?.patientIdCard || user?.idCard || '');
+  const [patientIdCardFront, setPatientIdCardFront] = useState<string[]>(editApp?.patientIdCardFront ? [editApp.patientIdCardFront] : (user?.idCardFront ? [user.idCardFront] : []));
+  const [patientIdCardBack, setPatientIdCardBack] = useState<string[]>(editApp?.patientIdCardBack ? [editApp.patientIdCardBack] : (user?.idCardBack ? [user.idCardBack] : []));
   
-  const [hospital, setHospital] = useState('');
-  const [otherHospital, setOtherHospital] = useState('');
-  const [department, setDepartment] = useState('');
-  const [date, setDate] = useState('');
-  const [cause, setCause] = useState('');
-  const [images, setImages] = useState<string[]>([]);
+  const [hospital, setHospital] = useState(initialHospital);
+  const [otherHospital, setOtherHospital] = useState(initialOtherHospital);
+  const [department, setDepartment] = useState(editApp?.department || '');
+  const [date, setDate] = useState(editApp?.date || '');
+  const [cause, setCause] = useState(editApp?.cause || '');
+  const [images, setImages] = useState<string[]>(editApp?.images || []);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   
   const [loading, setLoading] = useState(false);
@@ -42,7 +57,7 @@ export function InpatientApplyView() {
     const finalHospitalName = hospital === 'other' ? otherHospital : (MOCK_HOSPITALS.find(h => h.id === hospital)?.name || '');
 
         try {
-      const newApp = await submitInpatientAppService({
+      const appData = {
         userId: user!.id,
         userName: user!.name!,
         patientName,
@@ -54,8 +69,15 @@ export function InpatientApplyView() {
         date,
         cause,
         images
-      } as any);
-      addInpatientApp(newApp);
+      };
+
+      if (editApp) {
+        await resubmitInpatientAppService(editApp.id, appData);
+        updateInpatientApp(editApp.id, { ...appData, status: '待确认' });
+      } else {
+        const newApp = await submitInpatientAppService(appData as any);
+        addInpatientApp(newApp);
+      }
       setCurrentView('my');
     } catch (err: any) {
       setError(err.message || '提交失败');
