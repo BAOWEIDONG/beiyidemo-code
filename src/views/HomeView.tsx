@@ -110,7 +110,7 @@ export function HomeView() {
               >
                 <div className={`w-2 h-2 rounded-full ${['已审核', '已确认'].includes(item.status) ? 'bg-green-400' : item.status === '已驳回' ? 'bg-red-400' : 'bg-blue-400'}`}></div>
                 <div className="flex-1">
-                  <p className="text-xs font-bold text-slate-800">{item.hospitalName} {item._type === 'claim' ? `${(item as any).type}报销` : '住院报备'}</p>
+                  <p className="text-xs font-bold text-slate-800">{item.hospitalName}{(item as any).department ? ` - ${(item as any).department}` : ''} {item._type === 'claim' ? `${(item as any).type}报销` : '住院报备'}</p>
                   <p className="text-[10px] text-slate-400 mt-0.5">就医队员: {item.patientName} · {format(new Date(item.createdAt), 'yyyy-MM-dd')} · <span className={['待审核', '待确认'].includes(item.status) ? 'text-amber-500 font-bold' : ['已审核', '已确认'].includes(item.status) ? 'text-green-500 font-bold' : item.status === '已驳回' ? 'text-red-500 font-bold' : 'text-slate-500 font-bold'}>{item.status}</span></p>
                 </div>
                 {item._type === 'claim' && (

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
+import { reviewClaimService, reviewInpatientAppService } from '../api/c_end_service';
 import { LogOut, Filter, Check, X, Download, FileText, ChevronLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { Claim, InpatientApp } from '../types';
@@ -22,6 +23,7 @@ export function ReviewWorkBenchView() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   
   const [rejectReason, setRejectReason] = useState('');
+  const [loading, setLoading] = useState(false);
   const [approvedAmount, setApprovedAmount] = useState('');
   
   const [claimFilter, setClaimFilter] = useState<'全部'|'待审核'|'已审核'|'已驳回'>('待审核');
@@ -78,30 +80,38 @@ export function ReviewWorkBenchView() {
         showConfirm('提示', '请输入正确的核定赔付金额', hideConfirm, true);
         return;
       }
-      showConfirm('确认通过', '确定要通过该理赔并打款吗？', () => {
-        const auditRecord: any = {
-          id: Math.random().toString(36).substr(2, 9),
-          claimId: selectedClaim.id,
-          reviewerId: user?.id || 'unknown',
-          reviewerName: user?.name || '保险管理员',
-          reviewLevel: '保险审核',
-          approvedAmount: amount,
-          status: '通过',
-          feedback: '审核通过，已触发打款',
-          reviewTime: new Date().toISOString()
-        };
-        const newHistory = [...(selectedClaim.auditHistory || []), auditRecord];
-        
-        updateClaim(selectedClaim.id, { 
-          status: '已审核', 
-          approvedAmount: amount,
-          insuranceOpinion: '审核通过，已触发打款',
-          auditHistory: newHistory,
-          completedAt: new Date().toISOString()
-        });
-        setSelectedClaim(null);
-        setApprovedAmount('');
-        hideConfirm();
+      showConfirm('确认通过', '确定要通过该理赔并打款吗？', async () => {
+        setLoading(true);
+        try {
+          const auditRecord: any = {
+            id: Math.random().toString(36).substr(2, 9),
+            claimId: selectedClaim.id,
+            reviewerId: user?.id || 'unknown',
+            reviewerName: user?.name || '保险管理员',
+            reviewLevel: '保险审核',
+            approvedAmount: amount,
+            status: '通过',
+            feedback: '审核通过，已触发打款',
+            reviewTime: new Date().toISOString()
+          };
+          const newHistory = [...(selectedClaim.auditHistory || []), auditRecord];
+          const updateData = {
+            status: '已审核' as any,
+            approvedAmount: amount,
+            insuranceOpinion: '审核通过，已触发打款',
+            auditHistory: newHistory,
+            completedAt: new Date().toISOString()
+          };
+          await reviewClaimService(selectedClaim.id, 'approve', updateData);
+          updateClaim(selectedClaim.id, updateData);
+          setSelectedClaim(null);
+          setApprovedAmount('');
+          hideConfirm();
+        } catch (err: any) {
+          alert(err.message || '操作失败');
+        } finally {
+          setLoading(false);
+        }
       });
     }
   };
@@ -113,52 +123,69 @@ export function ReviewWorkBenchView() {
       return;
     }
     
-    showConfirm('确认驳回', '确定要驳回该理赔吗？', () => {
-      const auditRecord: any = {
-        id: Math.random().toString(36).substr(2, 9),
-        claimId: selectedClaim.id,
-        reviewerId: user?.id || 'unknown',
-        reviewerName: user?.name || '保险管理员',
-        reviewLevel: '保险审核',
-        status: '驳回',
-        feedback: rejectReason,
-        reviewTime: new Date().toISOString()
-      };
-      const newHistory = [...(selectedClaim.auditHistory || []), auditRecord];
-
-      updateClaim(selectedClaim.id, { 
-        status: '已驳回', 
-        rejectReason,
-        auditHistory: newHistory,
-        completedAt: new Date().toISOString()
-      });
-      setSelectedClaim(null);
-      setRejectReason('');
-      hideConfirm();
+    showConfirm('确认驳回', '确定要驳回该理赔吗？', async () => {
+      setLoading(true);
+      try {
+        const auditRecord: any = {
+          id: Math.random().toString(36).substr(2, 9),
+          claimId: selectedClaim.id,
+          reviewerId: user?.id || 'unknown',
+          reviewerName: user?.name || '保险管理员',
+          reviewLevel: '保险审核',
+          status: '驳回',
+          feedback: rejectReason,
+          reviewTime: new Date().toISOString()
+        };
+        const newHistory = [...(selectedClaim.auditHistory || []), auditRecord];
+        const updateData = {
+          status: '已驳回' as any,
+          rejectReason,
+          auditHistory: newHistory,
+          completedAt: new Date().toISOString()
+        };
+        await reviewClaimService(selectedClaim.id, 'reject', updateData);
+        updateClaim(selectedClaim.id, updateData);
+        setSelectedClaim(null);
+        setRejectReason('');
+        hideConfirm();
+      } catch (err: any) {
+        alert(err.message || '操作失败');
+      } finally {
+        setLoading(false);
+      }
     });
   };
 
   const handleApproveInpatient = () => {
     if (!selectedInpatient) return;
-    showConfirm('确认通过', '确定要通过该住院报备吗？', () => {
-      const auditRecord: any = {
-        id: Math.random().toString(36).substr(2, 9),
-        claimId: selectedInpatient.id,
-        reviewerId: user?.id || 'unknown',
-        reviewerName: user?.name || '北医管理员',
-        reviewLevel: '北医审核',
-        status: '确认',
-        feedback: '审核通过',
-        reviewTime: new Date().toISOString()
-      };
-      const newHistory = [...(selectedInpatient.auditHistory || []), auditRecord];
-      updateInpatientApp(selectedInpatient.id, { 
-        status: '已确认',
-        auditHistory: newHistory,
-        completedAt: new Date().toISOString()
-      });
-      setSelectedInpatient(null);
-      hideConfirm();
+    showConfirm('确认通过', '确定要通过该住院报备吗？', async () => {
+      setLoading(true);
+      try {
+        const auditRecord: any = {
+          id: Math.random().toString(36).substr(2, 9),
+          claimId: selectedInpatient.id,
+          reviewerId: user?.id || 'unknown',
+          reviewerName: user?.name || '北医管理员',
+          reviewLevel: '北医审核',
+          status: '确认',
+          feedback: '审核通过',
+          reviewTime: new Date().toISOString()
+        };
+        const newHistory = [...(selectedInpatient.auditHistory || []), auditRecord];
+        const updateData = {
+          status: '已确认' as any,
+          auditHistory: newHistory,
+          completedAt: new Date().toISOString()
+        };
+        await reviewInpatientAppService(selectedInpatient.id, 'approve', updateData);
+        updateInpatientApp(selectedInpatient.id, updateData);
+        setSelectedInpatient(null);
+        hideConfirm();
+      } catch (err: any) {
+        alert(err.message || '操作失败');
+      } finally {
+        setLoading(false);
+      }
     });
   };
 
@@ -168,27 +195,36 @@ export function ReviewWorkBenchView() {
       showConfirm('提示', '请填写驳回原因', hideConfirm, true);
       return;
     }
-    showConfirm('确认驳回', '确定要驳回该住院报备吗？', () => {
-      const auditRecord: any = {
-        id: Math.random().toString(36).substr(2, 9),
-        claimId: selectedInpatient.id,
-        reviewerId: user?.id || 'unknown',
-        reviewerName: user?.name || '北医管理员',
-        reviewLevel: '北医审核',
-        status: '驳回',
-        feedback: rejectReason,
-        reviewTime: new Date().toISOString()
-      };
-      const newHistory = [...(selectedInpatient.auditHistory || []), auditRecord];
-      updateInpatientApp(selectedInpatient.id, { 
-        status: '已驳回', 
-        rejectReason,
-        auditHistory: newHistory,
-        completedAt: new Date().toISOString()
-      });
-      setSelectedInpatient(null);
-      setRejectReason('');
-      hideConfirm();
+    showConfirm('确认驳回', '确定要驳回该住院报备吗？', async () => {
+      setLoading(true);
+      try {
+        const auditRecord: any = {
+          id: Math.random().toString(36).substr(2, 9),
+          claimId: selectedInpatient.id,
+          reviewerId: user?.id || 'unknown',
+          reviewerName: user?.name || '北医管理员',
+          reviewLevel: '北医审核',
+          status: '驳回',
+          feedback: rejectReason,
+          reviewTime: new Date().toISOString()
+        };
+        const newHistory = [...(selectedInpatient.auditHistory || []), auditRecord];
+        const updateData = {
+          status: '已驳回' as any,
+          rejectReason,
+          auditHistory: newHistory,
+          completedAt: new Date().toISOString()
+        };
+        await reviewInpatientAppService(selectedInpatient.id, 'reject', updateData);
+        updateInpatientApp(selectedInpatient.id, updateData);
+        setSelectedInpatient(null);
+        setRejectReason('');
+        hideConfirm();
+      } catch (err: any) {
+        alert(err.message || '操作失败');
+      } finally {
+        setLoading(false);
+      }
     });
   };
 
@@ -231,7 +267,7 @@ export function ReviewWorkBenchView() {
             <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full">{claim.status}</span>
           </div>
           <div className="text-xs text-slate-600 space-y-1 mb-3">
-            <p>就诊医院: {claim.hospitalName}</p>
+            <p>就诊医院: {claim.hospitalName}{claim.department ? ` - ${claim.department}` : ''}</p>
             <p>申请金额: <span className="font-bold text-slate-800">¥{claim.amount?.toFixed(2)}</span></p>
             <p>提交时间: {format(new Date(claim.createdAt), 'yyyy-MM-dd HH:mm')}</p>
             {claim.completedAt && (claim.status === '已审核' || claim.status === '已驳回') && (
@@ -259,7 +295,7 @@ export function ReviewWorkBenchView() {
             <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-full">{app.status}</span>
           </div>
           <div className="text-xs text-slate-600 space-y-1 mb-3">
-            <p>意向医院: {app.hospitalName}</p>
+            <p>意向医院: {app.hospitalName}{app.department ? ` - ${app.department}` : ''}</p>
             <p>预计入院: <span className="font-bold text-slate-800">{app.date}</span></p>
             <p>提交时间: {format(new Date(app.createdAt), 'yyyy-MM-dd HH:mm')}</p>
             {app.completedAt && (app.status === '已确认' || app.status === '已驳回') && (
@@ -306,6 +342,7 @@ export function ReviewWorkBenchView() {
               <div className="flex justify-between"><span className="text-slate-400">人员类型</span><span className="font-medium text-slate-800">国家队集训运动员</span></div>
               <div className="flex justify-between"><span className="text-slate-400">保障批次</span><span className="font-medium text-slate-800">2026年度集训人员险</span></div>
               <div className="flex justify-between"><span className="text-slate-400">就诊医院</span><span className="font-medium text-slate-800">{selectedClaim.hospitalName}</span></div>
+              {selectedClaim.department && <div className="flex justify-between"><span className="text-slate-400">就诊科室</span><span className="font-medium text-slate-800">{selectedClaim.department}</span></div>}
               <div className="flex justify-between"><span className="text-slate-400">就诊时间</span><span className="font-medium text-slate-800">{selectedClaim.date}</span></div>
               <div className="flex justify-between pt-2 border-t border-slate-50"><span className="text-slate-400">申请金额</span><span className="font-bold text-slate-800 text-sm">¥{selectedClaim.amount?.toFixed(2)}</span></div>
             </div>
@@ -445,6 +482,7 @@ export function ReviewWorkBenchView() {
               <div className="flex justify-between"><span className="text-slate-400">身份证号</span><span className="font-medium text-slate-800">{selectedInpatient.patientIdCard}</span></div>
               <div className="flex justify-between"><span className="text-slate-400">填报人(队医)</span><span className="font-medium text-slate-800">{selectedInpatient.userName}</span></div>
               <div className="flex justify-between"><span className="text-slate-400">意向医院</span><span className="font-medium text-slate-800">{selectedInpatient.hospitalName}</span></div>
+              {selectedInpatient.department && <div className="flex justify-between"><span className="text-slate-400">就诊科室</span><span className="font-medium text-slate-800">{selectedInpatient.department}</span></div>}
               <div className="flex justify-between"><span className="text-slate-400">预计入院</span><span className="font-medium text-slate-800">{selectedInpatient.date}</span></div>
               <div className="flex flex-col mt-2 pt-2 border-t border-slate-50">
                 <span className="text-slate-400 mb-1">病因描述</span>
@@ -564,20 +602,24 @@ export function ReviewWorkBenchView() {
 
         {user?.role === 'super_admin' ? (
           <div className="flex space-x-6">
-            <button 
-              onClick={() => setTab('claim')}
-              className={`pb-2 text-sm font-bold relative ${tab === 'claim' ? 'text-slate-900' : 'text-slate-400'}`}
-            >
-              门急诊理赔 <span className="ml-1 bg-slate-100 text-slate-600 text-[10px] px-1.5 rounded-full">{claims.filter(c => c.status === '待审核').length}</span>
-              {tab === 'claim' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900 rounded-full"></div>}
-            </button>
-            <button 
-              onClick={() => setTab('inpatient')}
-              className={`pb-2 text-sm font-bold relative ${tab === 'inpatient' ? 'text-slate-900' : 'text-slate-400'}`}
-            >
-              住院报备 <span className="ml-1 bg-purple-100 text-purple-600 text-[10px] px-1.5 rounded-full">{inpatientApps.filter(c => c.status === '待确认').length}</span>
-              {tab === 'inpatient' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900 rounded-full"></div>}
-            </button>
+            {isInsurance && (
+              <button 
+                onClick={() => setTab('claim')}
+                className={`pb-2 text-sm font-bold relative ${tab === 'claim' ? 'text-slate-900' : 'text-slate-400'}`}
+              >
+                门急诊理赔 <span className="ml-1 bg-slate-100 text-slate-600 text-[10px] px-1.5 rounded-full">{claims.filter(c => c.status === '待审核').length}</span>
+                {tab === 'claim' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900 rounded-full"></div>}
+              </button>
+            )}
+            {isBeiyi && (
+              <button 
+                onClick={() => setTab('inpatient')}
+                className={`pb-2 text-sm font-bold relative ${tab === 'inpatient' ? 'text-slate-900' : 'text-slate-400'}`}
+              >
+                住院报备 <span className="ml-1 bg-purple-100 text-purple-600 text-[10px] px-1.5 rounded-full">{inpatientApps.filter(c => c.status === '待确认').length}</span>
+                {tab === 'inpatient' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900 rounded-full"></div>}
+              </button>
+            )}
           </div>
         ) : (
           <div className="pb-2 text-sm font-bold text-slate-900 relative inline-block">
@@ -621,8 +663,15 @@ export function ReviewWorkBenchView() {
       {renderClaimDetail()}
       {renderInpatientDetail()}
 
+      {loading && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/20">
+          <div className="bg-white px-6 py-4 rounded-xl shadow-lg font-bold text-blue-600 text-sm flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div> 处理中...
+          </div>
+        </div>
+      )}
       {confirmDialog.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
             <h3 className="text-lg font-bold text-slate-800 mb-2">{confirmDialog.title}</h3>
             <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>

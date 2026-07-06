@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
+import { cancelClaimService, cancelInpatientAppService } from '../api/c_end_service';
 import { FileText, Clock, CheckCircle2, XCircle, AlertCircle, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Claim, InpatientApp } from '../types';
@@ -84,19 +85,29 @@ export function MyRecordsView() {
 
   const handleWithdrawClaim = () => {
     if (!selectedClaim) return;
-    showConfirm('确认撤销', '确定要撤销该报销申请吗？', () => {
-      updateClaim(selectedClaim.id, { status: '已撤销' });
-      setSelectedClaim(null);
-      hideConfirm();
+    showConfirm('确认撤销', '确定要撤销该报销申请吗？', async () => {
+      try {
+        await cancelClaimService(selectedClaim.id);
+        updateClaim(selectedClaim.id, { status: '已撤销' });
+        setSelectedClaim(null);
+        hideConfirm();
+      } catch (err: any) {
+        alert(err.message || '撤销失败');
+      }
     });
   };
 
   const handleWithdrawInpatient = () => {
     if (!selectedInpatient) return;
-    showConfirm('确认撤销', '确定要撤销该住院报备吗？', () => {
-      updateInpatientApp(selectedInpatient.id, { status: '已撤销' });
-      setSelectedInpatient(null);
-      hideConfirm();
+    showConfirm('确认撤销', '确定要撤销该住院报备吗？', async () => {
+      try {
+        await cancelInpatientAppService(selectedInpatient.id);
+        updateInpatientApp(selectedInpatient.id, { status: '已撤销' });
+        setSelectedInpatient(null);
+        hideConfirm();
+      } catch (err: any) {
+        alert(err.message || '撤销失败');
+      }
     });
   };
 
@@ -168,6 +179,7 @@ export function MyRecordsView() {
             <div className="flex justify-between text-xs"><span className="text-slate-500">就诊队员</span><span className="font-medium">{selectedClaim.patientName}</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">身份证号</span><span className="font-medium">{selectedClaim.patientIdCard}</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">就诊医院</span><span className="font-medium">{selectedClaim.hospitalName}</span></div>
+            {selectedClaim.department && <div className="flex justify-between text-xs"><span className="text-slate-500">就诊科室</span><span className="font-medium">{selectedClaim.department}</span></div>}
             <div className="flex justify-between text-xs"><span className="text-slate-500">就诊日期</span><span className="font-medium">{selectedClaim.date}</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">就诊类型</span><span className="font-medium">{selectedClaim.type}</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">申请金额</span><span className="font-bold">¥{selectedClaim.amount.toFixed(2)}</span></div>
@@ -267,6 +279,7 @@ export function MyRecordsView() {
             <div className="flex justify-between text-xs"><span className="text-slate-500">就诊队员</span><span className="font-medium">{selectedInpatient.patientName}</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">身份证号</span><span className="font-medium">{selectedInpatient.patientIdCard}</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">意向医院</span><span className="font-medium">{selectedInpatient.hospitalName}</span></div>
+            {selectedInpatient.department && <div className="flex justify-between text-xs"><span className="text-slate-500">就诊科室</span><span className="font-medium">{selectedInpatient.department}</span></div>}
             <div className="flex justify-between text-xs"><span className="text-slate-500">预计入院</span><span className="font-medium">{selectedInpatient.date}</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">病因描述</span><span className="font-medium text-right max-w-[60%]">{selectedInpatient.cause}</span></div>
             {renderImageSection('队员身份证正面', selectedInpatient.patientIdCardFront ? [selectedInpatient.patientIdCardFront] : [])}
@@ -395,7 +408,7 @@ export function MyRecordsView() {
                       <FileText className="text-blue-500 w-4 h-4" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-slate-800">{claim.hospitalName}</h4>
+                      <h4 className="text-sm font-bold text-slate-800">{claim.hospitalName}{claim.department ? ` - ${claim.department}` : ''}</h4>
                       <p className="text-[10px] text-slate-400">就医队员: {claim.patientName} · {format(new Date(claim.createdAt), 'yyyy-MM-dd HH:mm')} · {claim.type}</p>
                     </div>
                   </div>
@@ -456,7 +469,7 @@ export function MyRecordsView() {
                       <FileText className="text-purple-500 w-4 h-4" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-slate-800">{app.hospitalName}</h4>
+                      <h4 className="text-sm font-bold text-slate-800">{app.hospitalName}{app.department ? ` - ${app.department}` : ''}</h4>
                       <p className="text-[10px] text-slate-400">就医队员: {app.patientName} · {format(new Date(app.createdAt), 'yyyy-MM-dd HH:mm')}</p>
                     </div>
                   </div>

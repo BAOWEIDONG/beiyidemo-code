@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useAppStore } from '../store';
-import { ShieldCheck, MessageCircle, Building, Briefcase, Smartphone, KeyRound, CheckSquare, Square } from 'lucide-react';
+import { loginService, fetchClaimsService, fetchInpatientAppsService } from '../api/c_end_service';
+import { Smartphone, KeyRound, ShieldCheck, CheckSquare, Square } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAppStore } from '../store';
 import { Role } from '../types';
 
 export function LoginView() {
-  const { setUser, setCurrentView } = useAppStore();
+  const { setUser, setCurrentView, setClaims, setInpatientApps } = useAppStore();
   const [loading, setLoading] = useState<Role | null>(null);
   const [loginRole, setLoginRole] = useState<Role>('user');
   const [phone, setPhone] = useState('');
@@ -34,7 +35,7 @@ export function LoginView() {
     setCountdown(60);
   };
 
-  const handleLogin = () => {
+    const handleLogin = async () => {
     setError('');
     if (!phone || phone.length !== 11) {
       setError('请输入正确的11位手机号');
@@ -44,39 +45,31 @@ export function LoginView() {
       setError('请输入验证码');
       return;
     }
-    if (code.length !== 6) {
-      setError('验证码错误，请输入6位验证码');
-      return;
-    }
     if (!agreed) {
       setError('请先勾选同意《用户服务协议》及《隐私政策》');
       return;
     }
 
-
-    const validPhones = ['13800138000', '13900139000'];
-    if (loginRole === 'user' && !validPhones.includes(phone)) {
-      setError('该队员不存在，请联系管理员核实');
-      return;
-    }
-
     setLoading(loginRole);
-    setTimeout(() => {
-      setUser({
-        id: loginRole === 'user' ? 'u123' : 'admin_' + Date.now(),
-        phone: phone,
-        verified: loginRole !== 'user',
-        verifyStatus: loginRole !== 'user' ? 'verified' : 'unverified',
-        role: loginRole,
-        name: loginRole === 'beiyi_admin' ? '北医管理员' : loginRole === 'insurance_admin' ? '保险审核员' : undefined
-      });
+    try {
+      const user = await loginService({ phone, code, loginRole });
+      
+      const claimsData = await fetchClaimsService(user.id);
+      const inpatientAppsData = await fetchInpatientAppsService(user.id);
+      setClaims(claimsData);
+      setInpatientApps(inpatientAppsData);
+
+      setUser(user);
       if (loginRole === 'user') {
         setCurrentView('home');
       } else {
         setCurrentView('reviewWorkbench');
       }
+    } catch (err: any) {
+      setError(err.message || '登录失败');
+    } finally {
       setLoading(null);
-    }, 800);
+    }
   };
 
   return (

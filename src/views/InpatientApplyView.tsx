@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { useAppStore } from '../store';
+import { submitInpatientAppService } from '../api/c_end_service';
 import { Header } from '../components/Header';
 import { Camera, X, AlertCircle } from 'lucide-react';
 import { MOCK_HOSPITALS } from '../mockData';
@@ -14,6 +15,7 @@ export function InpatientApplyView() {
   
   const [hospital, setHospital] = useState('');
   const [otherHospital, setOtherHospital] = useState('');
+  const [department, setDepartment] = useState('');
   const [date, setDate] = useState('');
   const [cause, setCause] = useState('');
   const [images, setImages] = useState<string[]>([]);
@@ -30,7 +32,7 @@ export function InpatientApplyView() {
     setter(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!patientName || !patientIdCard || patientIdCardFront.length === 0 || patientIdCardBack.length === 0 || !hospital || (hospital === 'other' && !otherHospital) || !date || !cause) {
       setError('请填写意向医院、日期及病因描述，并上传患者身份证正反面照片');
       return;
@@ -39,9 +41,8 @@ export function InpatientApplyView() {
     
     const finalHospitalName = hospital === 'other' ? otherHospital : (MOCK_HOSPITALS.find(h => h.id === hospital)?.name || '');
 
-    setTimeout(() => {
-      addInpatientApp({
-        id: 'Z' + format(new Date(), 'yyyyMMddHHmmss') + Math.floor(1000 + Math.random() * 9000).toString(),
+        try {
+      const newApp = await submitInpatientAppService({
         userId: user!.id,
         userName: user!.name!,
         patientName,
@@ -49,15 +50,18 @@ export function InpatientApplyView() {
         patientIdCardFront: patientIdCardFront[0],
         patientIdCardBack: patientIdCardBack[0],
         hospitalName: finalHospitalName,
+        department,
         date,
         cause,
-        status: '待确认',
-        createdAt: new Date().toISOString(),
         images
-      });
+      } as any);
+      addInpatientApp(newApp);
       setCurrentView('my');
+    } catch (err: any) {
+      setError(err.message || '提交失败');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const renderUploadBox = (title: string, required: boolean, imgList: string[], setter: React.Dispatch<React.SetStateAction<string[]>>) => (
@@ -136,6 +140,15 @@ export function InpatientApplyView() {
                 className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-300"
               />
             )}
+            <div className="mt-4">
+              <input
+                type="text"
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                placeholder="就诊科室 (选填)"
+                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-300"
+              />
+            </div>
           </div>
 
           <div>

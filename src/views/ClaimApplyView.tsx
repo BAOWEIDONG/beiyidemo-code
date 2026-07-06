@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
+import { submitClaimService } from '../api/c_end_service';
 import { Header } from '../components/Header';
 import { Camera, X, AlertCircle } from 'lucide-react';
 import { MOCK_HOSPITALS } from '../mockData';
@@ -13,6 +14,7 @@ export function ClaimApplyView() {
   const [patientIdCardBack, setPatientIdCardBack] = useState<string[]>(user?.idCardBack ? [user.idCardBack] : []);
   const [hospital, setHospital] = useState('');
   const [otherHospital, setOtherHospital] = useState('');
+  const [department, setDepartment] = useState('');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [type, setType] = useState<'门诊'|'急诊'>('门诊');
   const [amount, setAmount] = useState('');
@@ -43,7 +45,7 @@ export function ClaimApplyView() {
     setter(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!patientName || !patientIdCard || patientIdCardFront.length === 0 || patientIdCardBack.length === 0 || !hospital || (hospital === 'other' && !otherHospital) || !date || !amount || !payeeName || !payeeAccount || !payeeBank || invoice.length === 0 || record.length === 0) {
       setError('请填写必填项，并至少上传发票和门诊病历，以及患者身份证正反面照片');
       return;
@@ -57,9 +59,8 @@ export function ClaimApplyView() {
     const finalHospitalName = hospital === 'other' ? otherHospital : (MOCK_HOSPITALS.find(h => h.id === hospital)?.name || '');
 
     setLoading(true);
-    setTimeout(() => {
-      addClaim({
-        id: 'M' + format(new Date(), 'yyyyMMddHHmmss') + Math.floor(1000 + Math.random() * 9000).toString(),
+        try {
+      const newClaim = await submitClaimService({
         userId: user!.id,
         userName: user!.name!,
         patientName,
@@ -67,19 +68,22 @@ export function ClaimApplyView() {
         patientIdCardFront: patientIdCardFront[0],
         patientIdCardBack: patientIdCardBack[0],
         hospitalName: finalHospitalName,
+        department,
         date,
         type,
         amount: numAmount,
         payeeName,
         payeeAccount,
         payeeBank,
-        status: '待审核',
-        createdAt: new Date().toISOString(),
         images: { invoice, record, cost, prescription, diagnosis }
-      });
+      } as any);
+      addClaim(newClaim);
       setCurrentView('my');
+    } catch (err: any) {
+      setError(err.message || '提交失败');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const renderUploadBox = (title: string, required: boolean, images: string[], setter: React.Dispatch<React.SetStateAction<string[]>>) => (
@@ -158,6 +162,15 @@ export function ClaimApplyView() {
                 className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-300"
               />
             )}
+            <div className="mt-4">
+              <input
+                type="text"
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                placeholder="就诊科室 (选填)"
+                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-300"
+              />
+            </div>
           </div>
 
           <div className="flex gap-4">
