@@ -1,0 +1,6 @@
+{
+  "name": "北京大学理赔与住院预申请",
+  "description": "微信小程序端理赔与住院预申请演示，包含身份验证、医院查询、理赔申请与进度记录功能",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
