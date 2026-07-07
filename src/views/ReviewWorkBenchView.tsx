@@ -78,10 +78,25 @@ export function ReviewWorkBenchView() {
         return;
       }
       showConfirm('确认通过', '确定要通过该理赔并打款吗？', () => {
+        const auditRecord: any = {
+          id: Math.random().toString(36).substr(2, 9),
+          claimId: selectedClaim.id,
+          reviewerId: user?.id || 'unknown',
+          reviewerName: user?.name || '保险管理员',
+          reviewLevel: '保险审核',
+          approvedAmount: amount,
+          status: '通过',
+          feedback: '审核通过，已触发打款',
+          reviewTime: new Date().toISOString()
+        };
+        const newHistory = [...(selectedClaim.auditHistory || []), auditRecord];
+        
         updateClaim(selectedClaim.id, { 
           status: '已审核', 
           approvedAmount: amount,
-          insuranceOpinion: '审核通过，已触发打款' 
+          insuranceOpinion: '审核通过，已触发打款',
+          auditHistory: newHistory,
+          completedAt: new Date().toISOString()
         });
         setSelectedClaim(null);
         setApprovedAmount('');
@@ -98,9 +113,23 @@ export function ReviewWorkBenchView() {
     }
     
     showConfirm('确认驳回', '确定要驳回该理赔吗？', () => {
+      const auditRecord: any = {
+        id: Math.random().toString(36).substr(2, 9),
+        claimId: selectedClaim.id,
+        reviewerId: user?.id || 'unknown',
+        reviewerName: user?.name || '保险管理员',
+        reviewLevel: '保险审核',
+        status: '驳回',
+        feedback: rejectReason,
+        reviewTime: new Date().toISOString()
+      };
+      const newHistory = [...(selectedClaim.auditHistory || []), auditRecord];
+
       updateClaim(selectedClaim.id, { 
         status: '已驳回', 
-        rejectReason 
+        rejectReason,
+        auditHistory: newHistory,
+        completedAt: new Date().toISOString()
       });
       setSelectedClaim(null);
       setRejectReason('');
@@ -111,7 +140,22 @@ export function ReviewWorkBenchView() {
   const handleApproveInpatient = () => {
     if (!selectedInpatient) return;
     showConfirm('确认通过', '确定要通过该住院报备吗？', () => {
-      updateInpatientApp(selectedInpatient.id, { status: '已确认' });
+      const auditRecord: any = {
+        id: Math.random().toString(36).substr(2, 9),
+        claimId: selectedInpatient.id,
+        reviewerId: user?.id || 'unknown',
+        reviewerName: user?.name || '北医管理员',
+        reviewLevel: '北医审核',
+        status: '确认',
+        feedback: '审核通过',
+        reviewTime: new Date().toISOString()
+      };
+      const newHistory = [...(selectedInpatient.auditHistory || []), auditRecord];
+      updateInpatientApp(selectedInpatient.id, { 
+        status: '已确认',
+        auditHistory: newHistory,
+        completedAt: new Date().toISOString()
+      });
       setSelectedInpatient(null);
       hideConfirm();
     });
@@ -124,7 +168,23 @@ export function ReviewWorkBenchView() {
       return;
     }
     showConfirm('确认驳回', '确定要驳回该住院报备吗？', () => {
-      updateInpatientApp(selectedInpatient.id, { status: '已驳回', rejectReason });
+      const auditRecord: any = {
+        id: Math.random().toString(36).substr(2, 9),
+        claimId: selectedInpatient.id,
+        reviewerId: user?.id || 'unknown',
+        reviewerName: user?.name || '北医管理员',
+        reviewLevel: '北医审核',
+        status: '驳回',
+        feedback: rejectReason,
+        reviewTime: new Date().toISOString()
+      };
+      const newHistory = [...(selectedInpatient.auditHistory || []), auditRecord];
+      updateInpatientApp(selectedInpatient.id, { 
+        status: '已驳回', 
+        rejectReason,
+        auditHistory: newHistory,
+        completedAt: new Date().toISOString()
+      });
       setSelectedInpatient(null);
       setRejectReason('');
       hideConfirm();
@@ -167,6 +227,9 @@ export function ReviewWorkBenchView() {
             <p>就诊医院: {claim.hospitalName}</p>
             <p>申请金额: <span className="font-bold text-slate-800">¥{claim.amount?.toFixed(2)}</span></p>
             <p>提交时间: {format(new Date(claim.createdAt), 'yyyy-MM-dd HH:mm')}</p>
+            {claim.completedAt && (claim.status === '已审核' || claim.status === '已驳回') && (
+              <p>审核记录: {format(new Date(claim.completedAt), 'yyyy-MM-dd HH:mm')} · {claim.auditHistory && claim.auditHistory.length > 0 ? claim.auditHistory[claim.auditHistory.length - 1].reviewerName : '保险审核员'}</p>
+            )}
           </div>
           <div className="flex justify-end">
             <button 
@@ -192,6 +255,9 @@ export function ReviewWorkBenchView() {
             <p>意向医院: {app.hospitalName}</p>
             <p>预计入院: <span className="font-bold text-slate-800">{app.date}</span></p>
             <p>提交时间: {format(new Date(app.createdAt), 'yyyy-MM-dd HH:mm')}</p>
+            {app.completedAt && (app.status === '已确认' || app.status === '已驳回') && (
+              <p>审核记录: {format(new Date(app.completedAt), 'yyyy-MM-dd HH:mm')} · {app.auditHistory && app.auditHistory.length > 0 ? app.auditHistory[app.auditHistory.length - 1].reviewerName : '北医管理员'}</p>
+            )}
           </div>
           <div className="flex justify-end">
             <button 
@@ -229,7 +295,7 @@ export function ReviewWorkBenchView() {
             <div className="space-y-2 text-xs text-slate-600">
               <div className="flex justify-between"><span className="text-slate-400">就诊队员</span><span className="font-medium text-slate-800">{selectedClaim.patientName}</span></div>
               <div className="flex justify-between"><span className="text-slate-400">身份证号</span><span className="font-medium text-slate-800">{selectedClaim.patientIdCard}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400">申请人(队医)</span><span className="font-medium text-slate-800">{selectedClaim.userName}</span></div>
+              <div className="flex justify-between"><span className="text-slate-400">填报人(队医)</span><span className="font-medium text-slate-800">{selectedClaim.userName}</span></div>
               <div className="flex justify-between"><span className="text-slate-400">人员类型</span><span className="font-medium text-slate-800">国家队集训运动员</span></div>
               <div className="flex justify-between"><span className="text-slate-400">保障批次</span><span className="font-medium text-slate-800">2026年度集训人员险</span></div>
               <div className="flex justify-between"><span className="text-slate-400">就诊医院</span><span className="font-medium text-slate-800">{selectedClaim.hospitalName}</span></div>
@@ -295,6 +361,42 @@ export function ReviewWorkBenchView() {
               <p className="text-sm text-red-600">{selectedClaim.rejectReason}</p>
             </div>
           )}
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+             <h4 className="text-xs font-bold text-slate-800 border-b border-slate-50 pb-2 mb-2">流转进度</h4>
+             <div className="relative pl-4 border-l-2 border-slate-100 space-y-4 text-xs">
+                <div className="relative">
+                  <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-300"></div>
+                  <p className="text-slate-800 font-medium">提交申请</p>
+                  <p className="text-slate-400 text-[10px] mt-0.5">{format(new Date(selectedClaim.createdAt), 'yyyy-MM-dd HH:mm')}</p>
+                </div>
+                {selectedClaim.status === '已撤销' && (
+                  <div className="relative">
+                    <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                    <p className="text-slate-800 font-medium">已撤销</p>
+                  </div>
+                )}
+                {selectedClaim.auditHistory && selectedClaim.auditHistory.map(record => (
+                  <div key={record.id} className="relative">
+                    <div className={`absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full ${record.status === '通过' ? 'bg-blue-400' : 'bg-red-400'}`}></div>
+                    <p className="text-slate-800 font-medium">{record.reviewLevel} {record.status}</p>
+                    <p className="text-slate-400 text-[10px] mt-0.5">{format(new Date(record.reviewTime), 'yyyy-MM-dd HH:mm')} · {record.reviewerName}</p>
+                    {record.approvedAmount && (
+                      <p className="text-slate-500 text-[10px] mt-1">核定赔付金额: ¥{record.approvedAmount.toFixed(2)}</p>
+                    )}
+                    {record.feedback && <p className="text-slate-600 text-[10px] mt-1 bg-slate-50 p-1.5 rounded">{record.feedback}</p>}
+                  </div>
+                ))}
+                {!selectedClaim.auditHistory && selectedClaim.status !== '待审核' && selectedClaim.status !== '已撤销' && (
+                  <div className="relative">
+                    <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-blue-400"></div>
+                    <p className="text-slate-800 font-medium">保险公司审核 {selectedClaim.status === '已驳回' ? '未通过' : '完成'}</p>
+                    {selectedClaim.completedAt && <p className="text-slate-400 text-[10px] mt-0.5">{format(new Date(selectedClaim.completedAt), 'yyyy-MM-dd HH:mm')}</p>}
+                    {selectedClaim.rejectReason && <p className="text-red-600 text-[10px] mt-1 bg-red-50 p-1.5 rounded">{selectedClaim.rejectReason}</p>}
+                  </div>
+                )}
+             </div>
+          </div>
         </div>
 
         {selectedClaim.status === '待审核' && (
@@ -334,7 +436,7 @@ export function ReviewWorkBenchView() {
             <div className="space-y-2 text-xs text-slate-600">
               <div className="flex justify-between"><span className="text-slate-400">就诊队员</span><span className="font-medium text-slate-800">{selectedInpatient.patientName}</span></div>
               <div className="flex justify-between"><span className="text-slate-400">身份证号</span><span className="font-medium text-slate-800">{selectedInpatient.patientIdCard}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400">申请人(队医)</span><span className="font-medium text-slate-800">{selectedInpatient.userName}</span></div>
+              <div className="flex justify-between"><span className="text-slate-400">填报人(队医)</span><span className="font-medium text-slate-800">{selectedInpatient.userName}</span></div>
               <div className="flex justify-between"><span className="text-slate-400">意向医院</span><span className="font-medium text-slate-800">{selectedInpatient.hospitalName}</span></div>
               <div className="flex justify-between"><span className="text-slate-400">预计入院</span><span className="font-medium text-slate-800">{selectedInpatient.date}</span></div>
               <div className="flex flex-col mt-2 pt-2 border-t border-slate-50">
@@ -375,6 +477,45 @@ export function ReviewWorkBenchView() {
               <p className="text-sm text-red-600">{selectedInpatient.rejectReason}</p>
             </div>
           )}
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+            <h4 className="text-xs font-bold text-slate-800 border-b border-slate-50 pb-2 mb-2">流转进度</h4>
+            <div className="relative pl-4 border-l-2 border-slate-100 space-y-4 text-xs">
+              <div className="relative">
+                <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-300"></div>
+                <p className="text-slate-800 font-medium">提交报备</p>
+                <p className="text-slate-400 text-[10px] mt-0.5">{format(new Date(selectedInpatient.createdAt), 'yyyy-MM-dd HH:mm')}</p>
+              </div>
+              {selectedInpatient.status === '已撤销' && (
+                <div className="relative">
+                  <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                  <p className="text-slate-800 font-medium">已撤销</p>
+                </div>
+              )}
+              {selectedInpatient.auditHistory && selectedInpatient.auditHistory.map(record => (
+                <div key={record.id} className="relative">
+                  <div className={`absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full ${record.status === '确认' ? 'bg-purple-400' : 'bg-red-400'}`}></div>
+                  <p className="text-slate-800 font-medium">{record.reviewLevel} {record.status}</p>
+                  <p className="text-slate-400 text-[10px] mt-0.5">{format(new Date(record.reviewTime), 'yyyy-MM-dd HH:mm')} · {record.reviewerName}</p>
+                  {record.feedback && <p className="text-slate-600 text-[10px] mt-1 bg-slate-50 p-1.5 rounded">{record.feedback}</p>}
+                </div>
+              ))}
+              {!selectedInpatient.auditHistory && selectedInpatient.status !== '待确认' && selectedInpatient.status !== '已撤销' && (
+                <div className="relative">
+                  <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-purple-400"></div>
+                  <p className="text-slate-800 font-medium">北医协调 {selectedInpatient.status === '已驳回' ? '未通过' : '通过'}</p>
+                  {selectedInpatient.completedAt && <p className="text-slate-400 text-[10px] mt-0.5">{format(new Date(selectedInpatient.completedAt), 'yyyy-MM-dd HH:mm')}</p>}
+                  {selectedInpatient.rejectReason && <p className="text-red-600 text-[10px] mt-1 bg-red-50 p-1.5 rounded">{selectedInpatient.rejectReason}</p>}
+                </div>
+              )}
+              {selectedInpatient.status === '已确认' && (
+                <div className="relative">
+                  <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                  <p className="text-slate-800 font-medium">已安排挂账结算</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {selectedInpatient.status === '待确认' && (

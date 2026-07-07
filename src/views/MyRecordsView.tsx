@@ -23,8 +23,9 @@ export function MyRecordsView() {
         const i = inpatientApps.find(a => a.id === viewProps.targetId);
         if (i) setSelectedInpatient(i);
       }
+      setCurrentView('my', { ...viewProps, targetId: undefined });
     }
-  }, [viewProps, claims, inpatientApps]);
+  }, [viewProps?.targetId]);
   
   const userClaims = claims.filter(c => {
     if (c.userId !== user?.id) return false;
@@ -180,10 +181,19 @@ export function MyRecordsView() {
                     <p className="text-slate-800 font-medium">已撤销</p>
                   </div>
                 )}
-                {selectedClaim.status !== '待审核' && selectedClaim.status !== '已撤销' && (
+                {selectedClaim.auditHistory && selectedClaim.auditHistory.map(record => (
+                  <div key={record.id} className="relative">
+                    <div className={`absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full ${record.status === '通过' ? 'bg-blue-400' : 'bg-red-400'}`}></div>
+                    <p className="text-slate-800 font-medium">{record.reviewLevel} {record.status}</p>
+                    <p className="text-slate-400 text-[10px] mt-0.5">{format(new Date(record.reviewTime), 'yyyy-MM-dd HH:mm')} · {record.reviewerName}</p>
+                    {record.feedback && <p className="text-slate-600 text-[10px] mt-1 bg-slate-50 p-1.5 rounded">{record.feedback}</p>}
+                  </div>
+                ))}
+                {!selectedClaim.auditHistory && selectedClaim.status !== '待审核' && selectedClaim.status !== '已撤销' && (
                   <div className="relative">
                     <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-blue-400"></div>
                     <p className="text-slate-800 font-medium">保险公司审核 {selectedClaim.status === '已驳回' ? '未通过' : '完成'}</p>
+                    {selectedClaim.completedAt && <p className="text-slate-400 text-[10px] mt-0.5">{format(new Date(selectedClaim.completedAt), 'yyyy-MM-dd HH:mm')}</p>}
                     {selectedClaim.rejectReason && <p className="text-red-600 text-[10px] mt-1 bg-red-50 p-1.5 rounded">{selectedClaim.rejectReason}</p>}
                   </div>
                 )}
@@ -248,10 +258,19 @@ export function MyRecordsView() {
                   <p className="text-slate-800 font-medium">已撤销</p>
                 </div>
               )}
-              {selectedInpatient.status !== '待确认' && selectedInpatient.status !== '已撤销' && (
+              {selectedInpatient.auditHistory && selectedInpatient.auditHistory.map(record => (
+                <div key={record.id} className="relative">
+                  <div className={`absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full ${record.status === '确认' ? 'bg-purple-400' : 'bg-red-400'}`}></div>
+                  <p className="text-slate-800 font-medium">{record.reviewLevel} {record.status}</p>
+                  <p className="text-slate-400 text-[10px] mt-0.5">{format(new Date(record.reviewTime), 'yyyy-MM-dd HH:mm')} · {record.reviewerName}</p>
+                  {record.feedback && <p className="text-slate-600 text-[10px] mt-1 bg-slate-50 p-1.5 rounded">{record.feedback}</p>}
+                </div>
+              ))}
+              {!selectedInpatient.auditHistory && selectedInpatient.status !== '待确认' && selectedInpatient.status !== '已撤销' && (
                 <div className="relative">
                   <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-purple-400"></div>
                   <p className="text-slate-800 font-medium">北医协调 {selectedInpatient.status === '已驳回' ? '未通过' : '通过'}</p>
+                  {selectedInpatient.completedAt && <p className="text-slate-400 text-[10px] mt-0.5">{format(new Date(selectedInpatient.completedAt), 'yyyy-MM-dd HH:mm')}</p>}
                   {selectedInpatient.rejectReason && <p className="text-red-600 text-[10px] mt-1 bg-red-50 p-1.5 rounded">{selectedInpatient.rejectReason}</p>}
                 </div>
               )}
@@ -367,6 +386,12 @@ export function MyRecordsView() {
                       <span className="text-sm font-bold text-green-600">¥{claim.approvedAmount.toFixed(2)}</span>
                     </div>
                   )}
+                  {claim.completedAt && (claim.status === '已审核' || claim.status === '已驳回') && (
+                    <div className="flex justify-between items-center mt-2 border-t border-slate-200 pt-2">
+                      <span className="text-[11px] text-slate-500">审核时间</span>
+                      <span className="text-[11px] text-slate-800">{format(new Date(claim.completedAt), 'yyyy-MM-dd HH:mm')}</span>
+                    </div>
+                  )}
                 </div>
 
                 {claim.status === '已驳回' && (
@@ -414,6 +439,12 @@ export function MyRecordsView() {
                 <div className="bg-slate-50 rounded-xl p-3 text-xs text-slate-600 space-y-1">
                   <p><span className="text-slate-400 mr-2">预计入院:</span>{app.date}</p>
                   <p><span className="text-slate-400 mr-2">病因描述:</span>{app.cause}</p>
+                  {app.completedAt && (app.status === '已确认' || app.status === '已驳回') && (
+                    <div className="flex justify-between items-center mt-2 border-t border-slate-200 pt-2">
+                      <span className="text-[11px] text-slate-500">审核时间</span>
+                      <span className="text-[11px] text-slate-800">{format(new Date(app.completedAt), 'yyyy-MM-dd HH:mm')}</span>
+                    </div>
+                  )}
                 </div>
 
                 {app.status === '已驳回' && (

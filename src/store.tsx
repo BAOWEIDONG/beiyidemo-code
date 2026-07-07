@@ -55,10 +55,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       amount: 1250.0,
       approvedAmount: 1250.0,
       createdAt: '2026-06-21T14:30:00Z',
+      completedAt: '2026-06-22T09:00:00Z',
       payeeName: '队医王',
       payeeAccount: '6222021001113333',
       payeeBank: '建设银行',
-      images: { invoice: ['https://picsum.photos/200/300?2'], record: ['https://picsum.photos/200/300?2r'], cost: [], prescription: [], diagnosis: [] }
+      images: { invoice: ['https://picsum.photos/200/300?2'], record: ['https://picsum.photos/200/300?2r'], cost: [], prescription: [], diagnosis: [] },
+      auditHistory: [
+        {
+          id: 'a2',
+          claimId: 'C1002',
+          reviewerId: 'admin2',
+          reviewerName: '保险管理员',
+          reviewLevel: '保险审核',
+          approvedAmount: 1250.0,
+          status: '通过',
+          feedback: '审核通过，已触发打款',
+          reviewTime: '2026-06-22T09:00:00Z'
+        }
+      ]
     },
     {
       id: 'C1003',
@@ -74,11 +88,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       status: '已驳回',
       amount: 800.0,
       createdAt: '2026-06-16T09:00:00Z',
+      completedAt: '2026-06-16T11:30:00Z',
       rejectReason: '发票不清晰，请重新上传',
       payeeName: '李四',
       payeeAccount: '6222021001114444',
       payeeBank: '农业银行',
-      images: { invoice: ['https://picsum.photos/200/300?3'], record: ['https://picsum.photos/200/300?3r'], cost: [], prescription: [], diagnosis: [] }
+      images: { invoice: ['https://picsum.photos/200/300?3'], record: ['https://picsum.photos/200/300?3r'], cost: [], prescription: [], diagnosis: [] },
+      auditHistory: [
+        {
+          id: 'a3',
+          claimId: 'C1003',
+          reviewerId: 'admin2',
+          reviewerName: '保险管理员',
+          reviewLevel: '保险审核',
+          status: '驳回',
+          feedback: '发票不清晰，请重新上传',
+          reviewTime: '2026-06-16T11:30:00Z'
+        }
+      ]
     },
     {
       id: 'C1004',
@@ -129,7 +156,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       cause: '半月板损伤修复',
       status: '已确认',
       createdAt: '2026-06-20T10:00:00Z',
-      images: ['https://picsum.photos/200/300?6']
+      completedAt: '2026-06-21T14:30:00Z',
+      images: ['https://picsum.photos/200/300?6'],
+      auditHistory: [
+        {
+          id: 'a3',
+          claimId: 'I2002',
+          reviewerId: 'admin1',
+          reviewerName: '北医管理员',
+          reviewLevel: '北医审核',
+          status: '确认',
+          feedback: '审核通过，已安排挂账',
+          reviewTime: '2026-06-21T14:30:00Z'
+        }
+      ]
     },
     {
       id: 'I2003',
@@ -145,7 +185,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       status: '已驳回',
       rejectReason: '非定点医院，请联系北医确认',
       createdAt: '2026-06-10T10:00:00Z',
-      images: ['https://picsum.photos/200/300?7']
+      completedAt: '2026-06-11T09:15:00Z',
+      images: ['https://picsum.photos/200/300?7'],
+      auditHistory: [
+        {
+          id: 'a4',
+          claimId: 'I2003',
+          reviewerId: 'admin1',
+          reviewerName: '北医管理员',
+          reviewLevel: '北医审核',
+          status: '驳回',
+          feedback: '非定点医院，请联系北医确认',
+          reviewTime: '2026-06-11T09:15:00Z'
+        }
+      ]
     },
     {
       id: 'I2004',
