@@ -122,7 +122,7 @@ export function InpatientApplyView() {
               className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-300 mb-2"
             >
               <option value="">请选择意向医院</option>
-              {MOCK_HOSPITALS.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+              {MOCK_HOSPITALS.slice().sort((a,b) => parseFloat(a.distance) - parseFloat(b.distance)).map(h => <option key={h.id} value={h.id}>{h.name} ({h.distance})</option>)}
               <option value="other">其他医院 (手动输入)</option>
             </select>
             {hospital === 'other' && (

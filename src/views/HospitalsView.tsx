@@ -10,12 +10,14 @@ export function HospitalsView() {
   const [isMap, setIsMap] = useState(false);
   const [city, setCity] = useState('北京');
   
+  const [confirmDialog, setConfirmDialog] = useState<{isOpen: boolean; phone: string}>({isOpen: false, phone: ''});
+
   const cities = ['北京', '上海', '广州', '深圳', '成都'];
 
   const filtered = MOCK_HOSPITALS.filter(h => 
     h.city === city &&
     (h.name.includes(search) || h.departments.some(d => d.includes(search)))
-  );
+  ).sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
 
   return (
     <div className="min-h-screen bg-white flex flex-col pb-20">
@@ -113,9 +115,7 @@ export function HospitalsView() {
                   <button 
                     onClick={(e) => { 
                       e.stopPropagation(); 
-                      if (window.confirm(`拨打医院电话: ${hospital.phone}?`)) {
-                        window.location.href = `tel:${hospital.phone}`;
-                      }
+                      setConfirmDialog({ isOpen: true, phone: hospital.phone });
                     }} 
                     className="p-1.5 text-slate-500 bg-slate-50 rounded-full active:bg-slate-100"
                   >
@@ -151,6 +151,32 @@ export function HospitalsView() {
           {isMap ? '返回列表视图' : '地图模式查看附近'}
         </button>
       </div>
+
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <h3 className="text-lg font-bold text-slate-800 mb-2">提示</h3>
+            <p className="text-sm text-slate-600 mb-6">拨打医院电话: {confirmDialog.phone}?</p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setConfirmDialog({ isOpen: false, phone: '' })}
+                className="flex-1 py-3 text-sm font-bold text-slate-600 bg-slate-100 rounded-xl"
+              >
+                取消
+              </button>
+              <button 
+                onClick={() => {
+                  window.location.href = `tel:${confirmDialog.phone}`;
+                  setConfirmDialog({ isOpen: false, phone: '' });
+                }}
+                className="flex-1 py-3 text-sm font-bold text-white bg-blue-600 rounded-xl"
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
