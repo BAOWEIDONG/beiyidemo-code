@@ -5,7 +5,7 @@
 
 import { useAppStore, AppProvider } from './store';
 import { LoginView } from './views/LoginView';
-import { VerifyIdentityView } from './views/VerifyIdentityView';
+
 import { HomeView } from './views/HomeView';
 import { HospitalsView } from './views/HospitalsView';
 import { ClaimApplyView } from './views/ClaimApplyView';
@@ -20,7 +20,7 @@ function AppContent() {
   const renderView = () => {
     switch (currentView) {
       case 'login': return <LoginView />;
-      case 'verify': return <VerifyIdentityView />;
+      
       case 'home': return <HomeView />;
       case 'hospitals': return <HospitalsView />;
       case 'claimApply': return <ClaimApplyView />;

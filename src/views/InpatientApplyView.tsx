@@ -1,21 +1,40 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { format } from 'date-fns';
 import { useAppStore } from '../store';
+import { submitInpatientAppService, resubmitInpatientAppService } from '../api/c_end_service';
 import { Header } from '../components/Header';
 import { Camera, X, AlertCircle } from 'lucide-react';
 import { MOCK_HOSPITALS } from '../mockData';
 
 export function InpatientApplyView() {
-  const { user, addInpatientApp, setCurrentView } = useAppStore();
-  const [patientName, setPatientName] = useState(user?.name || '');
-  const [patientIdCard, setPatientIdCard] = useState(user?.idCard || '');
-  const [patientIdCardFront, setPatientIdCardFront] = useState<string[]>(user?.idCardFront ? [user.idCardFront] : []);
-  const [patientIdCardBack, setPatientIdCardBack] = useState<string[]>(user?.idCardBack ? [user.idCardBack] : []);
+  const { user, inpatientApps, addInpatientApp, updateInpatientApp, setCurrentView, viewProps } = useAppStore();
+  const editApp = React.useMemo(() => inpatientApps.find(a => a.id === viewProps?.editId), [inpatientApps, viewProps?.editId]);
+
+  // Determine initial hospital matching logic
+  let initialHospital = '';
+  let initialOtherHospital = '';
+  if (editApp?.hospitalName) {
+    const matched = MOCK_HOSPITALS.find(h => h.name === editApp.hospitalName);
+    if (matched) {
+      initialHospital = matched.id;
+    } else {
+      initialHospital = 'other';
+      initialOtherHospital = editApp.hospitalName;
+    }
+  }
+
+  const [patientName, setPatientName] = useState(editApp?.patientName || user?.name || '');
+  const [patientIdCard, setPatientIdCard] = useState(editApp?.patientIdCard || user?.idCard || '');
+  const [patientIdCardFront, setPatientIdCardFront] = useState<string[]>(editApp?.patientIdCardFront ? [editApp.patientIdCardFront] : (user?.idCardFront ? [user.idCardFront] : []));
+  const [patientIdCardBack, setPatientIdCardBack] = useState<string[]>(editApp?.patientIdCardBack ? [editApp.patientIdCardBack] : (user?.idCardBack ? [user.idCardBack] : []));
   
-  const [hospital, setHospital] = useState('');
-  const [otherHospital, setOtherHospital] = useState('');
-  const [date, setDate] = useState('');
-  const [cause, setCause] = useState('');
-  const [images, setImages] = useState<string[]>([]);
+  const [hospital, setHospital] = useState(initialHospital);
+  const [otherHospital, setOtherHospital] = useState(initialOtherHospital);
+  const [department, setDepartment] = useState(editApp?.department || '');
+  const [date, setDate] = useState(editApp?.date || '');
+  const [cause, setCause] = useState(editApp?.cause || '');
+  const [images, setImages] = useState<string[]>(editApp?.images || []);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,7 +47,7 @@ export function InpatientApplyView() {
     setter(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!patientName || !patientIdCard || patientIdCardFront.length === 0 || patientIdCardBack.length === 0 || !hospital || (hospital === 'other' && !otherHospital) || !date || !cause) {
       setError('请填写意向医院、日期及病因描述，并上传患者身份证正反面照片');
       return;
@@ -37,9 +56,8 @@ export function InpatientApplyView() {
     
     const finalHospitalName = hospital === 'other' ? otherHospital : (MOCK_HOSPITALS.find(h => h.id === hospital)?.name || '');
 
-    setTimeout(() => {
-      addInpatientApp({
-        id: 'I' + Date.now().toString().slice(-4),
+        try {
+      const appData = {
         userId: user!.id,
         userName: user!.name!,
         patientName,
@@ -47,15 +65,25 @@ export function InpatientApplyView() {
         patientIdCardFront: patientIdCardFront[0],
         patientIdCardBack: patientIdCardBack[0],
         hospitalName: finalHospitalName,
+        department,
         date,
         cause,
-        status: '待确认',
-        createdAt: new Date().toISOString(),
         images
-      });
+      };
+
+      if (editApp) {
+        await resubmitInpatientAppService(editApp.id, appData);
+        updateInpatientApp(editApp.id, { ...appData, status: '待确认' });
+      } else {
+        const newApp = await submitInpatientAppService(appData as any);
+        addInpatientApp(newApp);
+      }
       setCurrentView('my');
+    } catch (err: any) {
+      setError(err.message || '提交失败');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const renderUploadBox = (title: string, required: boolean, imgList: string[], setter: React.Dispatch<React.SetStateAction<string[]>>) => (
@@ -64,7 +92,7 @@ export function InpatientApplyView() {
       <div className="flex flex-wrap gap-2">
         {imgList.map((img, i) => (
           <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-100">
-            <img src={img} alt="upload" className="w-full h-full object-cover" />
+            <img src={img} alt="upload" className="w-full h-full object-cover cursor-pointer" onClick={() => setPreviewImage(img)} />
             <button onClick={() => handleRemove(setter, i)} className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5"><X size={10}/></button>
           </div>
         ))}
@@ -134,6 +162,15 @@ export function InpatientApplyView() {
                 className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-300"
               />
             )}
+            <div className="mt-4">
+              <input
+                type="text"
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                placeholder="就诊科室 (选填)"
+                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-300"
+              />
+            </div>
           </div>
 
           <div>
@@ -172,6 +209,21 @@ export function InpatientApplyView() {
           {loading ? '提交中...' : '提交申请'}
         </button>
       </div>
+
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 text-white p-2"
+            onClick={() => setPreviewImage(null)}
+          >
+            <X size={32} />
+          </button>
+          <img src={previewImage} alt="preview" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   );
 }

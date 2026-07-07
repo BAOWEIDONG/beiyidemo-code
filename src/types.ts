@@ -58,6 +58,7 @@ export type Claim = {
   patientIdCardFront?: string;
   patientIdCardBack?: string;
   hospitalName: string;
+  department?: string;
   date: string;
   type: '门诊' | '急诊';
   status: '待审核' | '已审核' | '已撤销' | '已驳回';

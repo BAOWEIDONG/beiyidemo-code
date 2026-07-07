@@ -35,11 +35,10 @@ export function HomeView() {
           animate={{ y: 0, opacity: 1 }}
           className={`rounded-2xl p-5 text-white shadow-lg mb-6 ${isExpired ? 'bg-slate-400 shadow-slate-200' : 'bg-blue-600 shadow-blue-200'}`}
         >
-          <div className="flex justify-between items-start mb-1">
-            <p className="text-[10px] opacity-80 uppercase tracking-wider">{user?.insuranceCompany || '保险公司'}</p>
+          <div className="flex justify-end items-start mb-1">
             <span className="text-[10px] px-2 py-0.5 bg-white/20 rounded-full">{isExpired ? '已失效' : '生效中'}</span>
           </div>
-          <h3 className="text-lg font-bold mb-4">{user?.insuranceBatch || '年度集训人员险'}</h3>
+          <h3 className="text-3xl font-bold mb-4">{user?.insuranceBatch || '年度集训人员险'}</h3>
           
           <div className="flex justify-between text-[10px] opacity-80 pt-1">
             <span>保障期限：{user?.validFrom || '2026-01-01'} 至 {user?.validUntil || '2026-12-31'}</span>
@@ -111,8 +110,8 @@ export function HomeView() {
               >
                 <div className={`w-2 h-2 rounded-full ${['已审核', '已确认'].includes(item.status) ? 'bg-green-400' : item.status === '已驳回' ? 'bg-red-400' : 'bg-blue-400'}`}></div>
                 <div className="flex-1">
-                  <p className="text-xs font-bold text-slate-800">{item.hospitalName} {item._type === 'claim' ? `${(item as any).type}报销` : '住院报备'}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">就医队员: {item.patientName} · {format(new Date(item.createdAt), 'yyyy-MM-dd')} · {item.status}</p>
+                  <p className="text-xs font-bold text-slate-800">{item.hospitalName}{(item as any).department ? ` - ${(item as any).department}` : ''} {item._type === 'claim' ? `${(item as any).type}报销` : '住院报备'}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">就医队员: {item.patientName} · {format(new Date(item.createdAt), 'yyyy-MM-dd')} · <span className={['待审核', '待确认'].includes(item.status) ? 'text-amber-500 font-bold' : ['已审核', '已确认'].includes(item.status) ? 'text-green-500 font-bold' : item.status === '已驳回' ? 'text-red-500 font-bold' : 'text-slate-500 font-bold'}>{item.status}</span></p>
                 </div>
                 {item._type === 'claim' && (
                    <span className="text-xs font-bold text-slate-800">¥{(item as any).amount}</span>

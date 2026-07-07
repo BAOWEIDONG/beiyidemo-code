@@ -1,31 +1,49 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
+import { submitClaimService, resubmitClaimService } from '../api/c_end_service';
 import { Header } from '../components/Header';
 import { Camera, X, AlertCircle } from 'lucide-react';
 import { MOCK_HOSPITALS } from '../mockData';
 import { format } from 'date-fns';
 
 export function ClaimApplyView() {
-  const { user, addClaim, setCurrentView } = useAppStore();
-  const [patientName, setPatientName] = useState(user?.name || '');
-  const [patientIdCard, setPatientIdCard] = useState(user?.idCard || '');
-  const [patientIdCardFront, setPatientIdCardFront] = useState<string[]>(user?.idCardFront ? [user.idCardFront] : []);
-  const [patientIdCardBack, setPatientIdCardBack] = useState<string[]>(user?.idCardBack ? [user.idCardBack] : []);
-  const [hospital, setHospital] = useState('');
-  const [otherHospital, setOtherHospital] = useState('');
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [type, setType] = useState<'门诊'|'急诊'>('门诊');
-  const [amount, setAmount] = useState('');
+  const { user, claims, addClaim, updateClaim, setCurrentView, viewProps } = useAppStore();
+  const editClaim = React.useMemo(() => claims.find(c => c.id === viewProps?.editId), [claims, viewProps?.editId]);
+
+  // Determine initial hospital matching logic
+  let initialHospital = '';
+  let initialOtherHospital = '';
+  if (editClaim?.hospitalName) {
+    const matched = MOCK_HOSPITALS.find(h => h.name === editClaim.hospitalName);
+    if (matched) {
+      initialHospital = matched.id;
+    } else {
+      initialHospital = 'other';
+      initialOtherHospital = editClaim.hospitalName;
+    }
+  }
+
+  const [patientName, setPatientName] = useState(editClaim?.patientName || user?.name || '');
+  const [patientIdCard, setPatientIdCard] = useState(editClaim?.patientIdCard || user?.idCard || '');
+  const [patientIdCardFront, setPatientIdCardFront] = useState<string[]>(editClaim?.patientIdCardFront ? [editClaim.patientIdCardFront] : (user?.idCardFront ? [user.idCardFront] : []));
+  const [patientIdCardBack, setPatientIdCardBack] = useState<string[]>(editClaim?.patientIdCardBack ? [editClaim.patientIdCardBack] : (user?.idCardBack ? [user.idCardBack] : []));
+  const [hospital, setHospital] = useState(initialHospital);
+  const [otherHospital, setOtherHospital] = useState(initialOtherHospital);
+  const [department, setDepartment] = useState(editClaim?.department || '');
+  const [date, setDate] = useState(editClaim?.date || format(new Date(), 'yyyy-MM-dd'));
+  const [type, setType] = useState<'门诊'|'急诊'>(editClaim?.type || '门诊');
+  const [amount, setAmount] = useState(editClaim?.amount?.toString() || '');
   
-  const [payeeName, setPayeeName] = useState('');
-  const [payeeAccount, setPayeeAccount] = useState('');
-  const [payeeBank, setPayeeBank] = useState('');
+  const [payeeName, setPayeeName] = useState(editClaim?.payeeName || '');
+  const [payeeAccount, setPayeeAccount] = useState(editClaim?.payeeAccount || '');
+  const [payeeBank, setPayeeBank] = useState(editClaim?.payeeBank || '');
   
-  const [invoice, setInvoice] = useState<string[]>([]);
-  const [record, setRecord] = useState<string[]>([]);
-  const [cost, setCost] = useState<string[]>([]);
-  const [prescription, setPrescription] = useState<string[]>([]);
-  const [diagnosis, setDiagnosis] = useState<string[]>([]);
+  const [invoice, setInvoice] = useState<string[]>(editClaim?.images.invoice || []);
+  const [record, setRecord] = useState<string[]>(editClaim?.images.record || []);
+  const [cost, setCost] = useState<string[]>(editClaim?.images.cost || []);
+  const [prescription, setPrescription] = useState<string[]>(editClaim?.images.prescription || []);
+  const [diagnosis, setDiagnosis] = useState<string[]>(editClaim?.images.diagnosis || []);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,7 +60,7 @@ export function ClaimApplyView() {
     setter(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!patientName || !patientIdCard || patientIdCardFront.length === 0 || patientIdCardBack.length === 0 || !hospital || (hospital === 'other' && !otherHospital) || !date || !amount || !payeeName || !payeeAccount || !payeeBank || invoice.length === 0 || record.length === 0) {
       setError('请填写必填项，并至少上传发票和门诊病历，以及患者身份证正反面照片');
       return;
@@ -56,9 +74,8 @@ export function ClaimApplyView() {
     const finalHospitalName = hospital === 'other' ? otherHospital : (MOCK_HOSPITALS.find(h => h.id === hospital)?.name || '');
 
     setLoading(true);
-    setTimeout(() => {
-      addClaim({
-        id: 'C' + Date.now().toString().slice(-4),
+        try {
+      const claimData = {
         userId: user!.id,
         userName: user!.name!,
         patientName,
@@ -66,19 +83,29 @@ export function ClaimApplyView() {
         patientIdCardFront: patientIdCardFront[0],
         patientIdCardBack: patientIdCardBack[0],
         hospitalName: finalHospitalName,
+        department,
         date,
         type,
         amount: numAmount,
         payeeName,
         payeeAccount,
         payeeBank,
-        status: '待审核',
-        createdAt: new Date().toISOString(),
         images: { invoice, record, cost, prescription, diagnosis }
-      });
+      };
+
+      if (editClaim) {
+        await resubmitClaimService(editClaim.id, claimData);
+        updateClaim(editClaim.id, { ...claimData, status: '待审核' });
+      } else {
+        const newClaim = await submitClaimService(claimData as any);
+        addClaim(newClaim);
+      }
       setCurrentView('my');
+    } catch (err: any) {
+      setError(err.message || '提交失败');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const renderUploadBox = (title: string, required: boolean, images: string[], setter: React.Dispatch<React.SetStateAction<string[]>>) => (
@@ -87,7 +114,7 @@ export function ClaimApplyView() {
       <div className="flex flex-wrap gap-2">
         {images.map((img, i) => (
           <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-100">
-            <img src={img} alt="upload" className="w-full h-full object-cover" />
+            <img src={img} alt="upload" className="w-full h-full object-cover cursor-pointer" onClick={() => setPreviewImage(img)} />
             <button onClick={() => handleRemove(setter, i)} className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5"><X size={10}/></button>
           </div>
         ))}
@@ -157,6 +184,15 @@ export function ClaimApplyView() {
                 className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-300"
               />
             )}
+            <div className="mt-4">
+              <input
+                type="text"
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                placeholder="就诊科室 (选填)"
+                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-300"
+              />
+            </div>
           </div>
 
           <div className="flex gap-4">
@@ -249,6 +285,21 @@ export function ClaimApplyView() {
           {loading ? '提交中...' : '提交报销'}
         </button>
       </div>
+
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 text-white p-2"
+            onClick={() => setPreviewImage(null)}
+          >
+            <X size={32} />
+          </button>
+          <img src={previewImage} alt="preview" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   );
 }

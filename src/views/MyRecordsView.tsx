@@ -1,6 +1,8 @@
+
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { FileText, Clock, CheckCircle2, XCircle, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { cancelClaimService, cancelInpatientAppService } from '../api/c_end_service';
+import { FileText, Clock, CheckCircle2, XCircle, AlertCircle, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Claim, InpatientApp } from '../types';
 
@@ -13,6 +15,7 @@ export function MyRecordsView() {
   
   const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
   const [selectedInpatient, setSelectedInpatient] = useState<InpatientApp | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   
   useEffect(() => {
     if (viewProps?.targetId) {
@@ -34,7 +37,7 @@ export function MyRecordsView() {
     if (claimFilter === '已撤销') return c.status === '已撤销';
     if (claimFilter === '已驳回') return c.status === '已驳回';
     return true;
-  });
+  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   
   const userInpatients = inpatientApps.filter(c => {
     if (c.userId !== user?.id) return false;
@@ -43,7 +46,7 @@ export function MyRecordsView() {
     if (inpatientFilter === '已撤销') return c.status === '已撤销';
     if (inpatientFilter === '已驳回') return c.status === '已驳回';
     return true;
-  });
+  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const getStatusColor = (status: string) => {
     if (status === '已审核' || status === '已确认') return 'text-green-600 bg-green-50 border-green-100';
@@ -82,19 +85,29 @@ export function MyRecordsView() {
 
   const handleWithdrawClaim = () => {
     if (!selectedClaim) return;
-    showConfirm('确认撤销', '确定要撤销该报销申请吗？', () => {
-      updateClaim(selectedClaim.id, { status: '已撤销' });
-      setSelectedClaim(null);
-      hideConfirm();
+    showConfirm('确认撤销', '确定要撤销该报销申请吗？', async () => {
+      try {
+        await cancelClaimService(selectedClaim.id);
+        updateClaim(selectedClaim.id, { status: '已撤销' });
+        setSelectedClaim(null);
+        hideConfirm();
+      } catch (err: any) {
+        alert(err.message || '撤销失败');
+      }
     });
   };
 
   const handleWithdrawInpatient = () => {
     if (!selectedInpatient) return;
-    showConfirm('确认撤销', '确定要撤销该住院报备吗？', () => {
-      updateInpatientApp(selectedInpatient.id, { status: '已撤销' });
-      setSelectedInpatient(null);
-      hideConfirm();
+    showConfirm('确认撤销', '确定要撤销该住院报备吗？', async () => {
+      try {
+        await cancelInpatientAppService(selectedInpatient.id);
+        updateInpatientApp(selectedInpatient.id, { status: '已撤销' });
+        setSelectedInpatient(null);
+        hideConfirm();
+      } catch (err: any) {
+        alert(err.message || '撤销失败');
+      }
     });
   };
 
@@ -105,8 +118,34 @@ export function MyRecordsView() {
         <h5 className="text-[10px] font-bold text-slate-400 mb-2">{title}</h5>
         <div className="flex flex-wrap gap-2">
           {images.map((img, i) => (
-            <img key={i} src={img} alt="material" className="w-16 h-16 rounded-lg object-cover border border-slate-100" />
+            <img key={i} src={img} alt="material" className="w-12 h-12 object-cover rounded-lg border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setPreviewImage(img)} />
           ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderConfirmDialog = () => {
+    if (!confirmDialog.isOpen) return null;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+          <h3 className="text-lg font-bold text-slate-800 mb-2">{confirmDialog.title}</h3>
+          <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+          <div className="flex gap-3">
+            <button 
+              onClick={hideConfirm}
+              className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm"
+            >
+              取消
+            </button>
+            <button 
+              onClick={confirmDialog.onConfirm}
+              className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-md"
+            >
+              确定
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -133,6 +172,13 @@ export function MyRecordsView() {
                 撤销申请
               </button>
             )}
+            {selectedClaim.status === '已驳回' && (
+              <button 
+                onClick={() => setCurrentView('claimApply', { editId: selectedClaim.id })}
+                className="mt-4 px-6 py-2 bg-blue-600 text-white text-xs font-bold rounded-full active:bg-blue-700">
+                重新编辑
+              </button>
+            )}
           </div>
 
           <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
@@ -140,6 +186,7 @@ export function MyRecordsView() {
             <div className="flex justify-between text-xs"><span className="text-slate-500">就诊队员</span><span className="font-medium">{selectedClaim.patientName}</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">身份证号</span><span className="font-medium">{selectedClaim.patientIdCard}</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">就诊医院</span><span className="font-medium">{selectedClaim.hospitalName}</span></div>
+            {selectedClaim.department && <div className="flex justify-between text-xs"><span className="text-slate-500">就诊科室</span><span className="font-medium">{selectedClaim.department}</span></div>}
             <div className="flex justify-between text-xs"><span className="text-slate-500">就诊日期</span><span className="font-medium">{selectedClaim.date}</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">就诊类型</span><span className="font-medium">{selectedClaim.type}</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">申请金额</span><span className="font-bold">¥{selectedClaim.amount.toFixed(2)}</span></div>
@@ -206,6 +253,7 @@ export function MyRecordsView() {
              </div>
           </div>
         </div>
+        {renderConfirmDialog()}
       </div>
     );
   }
@@ -231,6 +279,13 @@ export function MyRecordsView() {
                 撤销报备
               </button>
             )}
+            {selectedInpatient.status === '已驳回' && (
+              <button 
+                onClick={() => setCurrentView('inpatientApply', { editId: selectedInpatient.id })}
+                className="mt-4 px-6 py-2 bg-purple-600 text-white text-xs font-bold rounded-full active:bg-purple-700">
+                重新编辑
+              </button>
+            )}
           </div>
 
           <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
@@ -238,6 +293,7 @@ export function MyRecordsView() {
             <div className="flex justify-between text-xs"><span className="text-slate-500">就诊队员</span><span className="font-medium">{selectedInpatient.patientName}</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">身份证号</span><span className="font-medium">{selectedInpatient.patientIdCard}</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">意向医院</span><span className="font-medium">{selectedInpatient.hospitalName}</span></div>
+            {selectedInpatient.department && <div className="flex justify-between text-xs"><span className="text-slate-500">就诊科室</span><span className="font-medium">{selectedInpatient.department}</span></div>}
             <div className="flex justify-between text-xs"><span className="text-slate-500">预计入院</span><span className="font-medium">{selectedInpatient.date}</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">病因描述</span><span className="font-medium text-right max-w-[60%]">{selectedInpatient.cause}</span></div>
             {renderImageSection('队员身份证正面', selectedInpatient.patientIdCardFront ? [selectedInpatient.patientIdCardFront] : [])}
@@ -288,6 +344,7 @@ export function MyRecordsView() {
             {renderImageSection('住院通知单', selectedInpatient.images)}
           </div>
         </div>
+        {renderConfirmDialog()}
       </div>
     );
   }
@@ -360,16 +417,16 @@ export function MyRecordsView() {
                 className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm active:bg-slate-50 transition-colors"
               >
                 <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center">
+                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                    <div className="shrink-0 w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center">
                       <FileText className="text-blue-500 w-4 h-4" />
                     </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-800">{claim.hospitalName}</h4>
-                      <p className="text-[10px] text-slate-400">就医队员: {claim.patientName} · {format(new Date(claim.createdAt), 'yyyy-MM-dd HH:mm')} · {claim.type}</p>
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-bold text-slate-800 truncate">{claim.hospitalName}{claim.department ? ` - ${claim.department}` : ''}</h4>
+                      <p className="text-[10px] text-slate-400">就医队员: {claim.patientName} · 提交时间: {format(new Date(claim.createdAt), 'yyyy-MM-dd HH:mm')} · {claim.type}</p>
                     </div>
                   </div>
-                  <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold border ${getStatusColor(claim.status)}`}>
+                  <div className={`shrink-0 whitespace-nowrap flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold border ${getStatusColor(claim.status)}`}>
                     {getStatusIcon(claim.status)}
                     {claim.status}
                   </div>
@@ -401,9 +458,16 @@ export function MyRecordsView() {
                   </div>
                 )}
                 
-                {claim.status === '已驳回' && claim.requiredDocs && claim.requiredDocs.length > 0 && (
+                {claim.status === '已驳回' && (
                   <div className="mt-3 flex justify-end">
-                    <button className="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-full">补充材料</button>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentView('claimApply', { editId: claim.id });
+                      }}
+                      className="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-full">
+                      重新编辑
+                    </button>
                   </div>
                 )}
               </div>
@@ -421,16 +485,16 @@ export function MyRecordsView() {
                 className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm active:bg-slate-50 transition-colors"
               >
                  <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center">
+                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                    <div className="shrink-0 w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center">
                       <FileText className="text-purple-500 w-4 h-4" />
                     </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-800">{app.hospitalName}</h4>
-                      <p className="text-[10px] text-slate-400">就医队员: {app.patientName} · {format(new Date(app.createdAt), 'yyyy-MM-dd HH:mm')}</p>
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-bold text-slate-800 truncate">{app.hospitalName}{app.department ? ` - ${app.department}` : ''}</h4>
+                      <p className="text-[10px] text-slate-400">就医队员: {app.patientName} · 提交时间: {format(new Date(app.createdAt), 'yyyy-MM-dd HH:mm')}</p>
                     </div>
                   </div>
-                  <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold border ${getStatusColor(app.status)}`}>
+                  <div className={`shrink-0 whitespace-nowrap flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold border ${getStatusColor(app.status)}`}>
                     {getStatusIcon(app.status)}
                     {app.status}
                   </div>
@@ -448,10 +512,22 @@ export function MyRecordsView() {
                 </div>
 
                 {app.status === '已驳回' && (
-                  <div className="mt-3 text-[11px] text-red-600 bg-red-50 p-2 rounded-lg flex gap-1">
-                     <AlertCircle size={14} className="shrink-0" />
-                     <span>原因：{app.rejectReason}</span>
-                  </div>
+                  <>
+                    <div className="mt-3 text-[11px] text-red-600 bg-red-50 p-2 rounded-lg flex gap-1">
+                      <AlertCircle size={14} className="shrink-0" />
+                      <span>原因：{app.rejectReason}</span>
+                    </div>
+                    <div className="mt-3 flex justify-end">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentView('inpatientApply', { editId: app.id });
+                        }}
+                        className="px-4 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-full">
+                        重新编辑
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
             ))}
@@ -459,27 +535,19 @@ export function MyRecordsView() {
           </div>
         )}
       </div>
-
-      {confirmDialog.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
-            <h3 className="text-lg font-bold text-slate-800 mb-2">{confirmDialog.title}</h3>
-            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
-            <div className="flex gap-3">
-              <button 
-                onClick={hideConfirm}
-                className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm"
-              >
-                取消
-              </button>
-              <button 
-                onClick={confirmDialog.onConfirm}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-md"
-              >
-                确定
-              </button>
-            </div>
-          </div>
+      {renderConfirmDialog()}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 text-white p-2"
+            onClick={() => setPreviewImage(null)}
+          >
+            <X size={32} />
+          </button>
+          <img src={previewImage} alt="preview" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
     </div>
